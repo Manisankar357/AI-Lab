@@ -10,12 +10,14 @@ import * as lesson from "./views/lesson.js";
 import * as revision from "./views/revision.js";
 import * as tutor from "./views/tutor.js";
 import * as words from "./views/words.js";
+import * as plan from "./views/plan.js";
 
 const ROUTES = {
   home: { view: home, label: "Home" },
   roadmap: { view: roadmap, label: "Roadmap" },
   graph: { view: graph, label: "Knowledge Graph" },
   lessons: { view: lessons, label: "Lessons" },
+  plan: { view: plan, label: "Study plan" },
   projects: { view: projects, label: "Projects" },
   words: { view: words, label: "Word book" },
   revision: { view: revision, label: "Revision" },

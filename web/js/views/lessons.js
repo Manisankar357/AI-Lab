@@ -1,6 +1,7 @@
 import { LESSONS, DIFFICULTY, phaseByKey } from "../curriculum.js";
 import { lessonState, isLocked } from "../store.js";
 import { h, statusBadge, stagger } from "../ui.js";
+import { lessonDeadlines, fmtDate } from "../plan.js";
 
 export function render(root) {
   root.append(
@@ -10,11 +11,12 @@ export function render(root) {
       const st = lessonState(l.id);
       const d = DIFFICULTY[l.difficulty];
       const locked = isLocked(l.id);
+      const due = lessonDeadlines()[l.id];
       const badge = !l.module ? h("span.badge", "Written when you get here")
         : locked ? h("span.badge", "🔒 Locked") : statusBadge(st.status);
       const body = [
         h("div", h("div.eyebrow", `Lesson ${l.id.slice(1)} · ${phaseByKey(l.phase).title}`), h("h3", { style: { margin: 0 } }, l.title),
-          h("div.small.muted", `${d.dot} ${d.label} · ~${l.minutes} min`)),
+          h("div.small.muted", `${d.dot} ${d.label} · ${l.hours} h planned${due && st.status !== "mastered" ? ` · deadline ${fmtDate(due)}` : ""}`)),
         badge,
       ];
       return l.module && !locked

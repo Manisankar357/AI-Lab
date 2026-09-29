@@ -9,18 +9,20 @@ Run:  python server.py        then open http://localhost:8765
 import json
 import os
 import tempfile
+import threading
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web"
-DATA_DIR = ROOT / "data"
+DATA_DIR = Path(os.environ.get("LAB_DATA_DIR", ROOT / "data"))  # override for testing
 PROGRESS_FILE = DATA_DIR / "progress.json"
 # Tutor-owned: written only by tools/review.py, never by the browser, so an
 # open dashboard tab can't overwrite a review.
 REVIEWS_FILE = DATA_DIR / "reviews.json"
 TUTOR_KEYS = ("reviews", "completedProjects")
+SAVE_LOCK = threading.Lock()
 HOST = "127.0.0.1"  # localhost only: your learning data never leaves this machine
 PORT = int(os.environ.get("LAB_PORT", "8765"))
 MAX_BODY_BYTES = 2_000_000
@@ -97,16 +99,36 @@ class LabHandler(SimpleHTTPRequestHandler):
         if not isinstance(progress, dict):
             self._send_json({"error": "progress must be an object"}, HTTPStatus.BAD_REQUEST)
             return
-        save_progress(progress)
-        self._send_json({"ok": True})
+        # Optimistic concurrency: each save must be based on the latest copy.
+        # A stale tab gets 409 and re-applies its change on top of the latest.
+        with SAVE_LOCK:
+            current_rev = read_json(PROGRESS_FILE).get("rev", 0)
+            # Tabs opened before this check existed send no "rev": accept them.
+            if "rev" in progress and progress["rev"] != current_rev:
+                self._send_json({"error": "stale", "rev": current_rev}, HTTPStatus.CONFLICT)
+                return
+            progress["rev"] = current_rev + 1
+            save_progress(progress)
+        self._send_json({"ok": True, "rev": progress["rev"]})
 
     def log_message(self, fmt, *args):
         if "/api/" in self.path:
             super().log_message(fmt, *args)
 
 
+class LabServer(ThreadingHTTPServer):
+    # On Windows, SO_REUSEADDR lets a second server silently share the port,
+    # so two copies would both answer requests. Refuse instead.
+    allow_reuse_address = os.name != "nt"
+
+
 def main():
-    server = ThreadingHTTPServer((HOST, PORT), LabHandler)
+    try:
+        server = LabServer((HOST, PORT), LabHandler)
+    except OSError:
+        print(f"The lab is already running at http://localhost:{PORT}: just open that in your browser.")
+        print("(To restart it, press Ctrl+C in the terminal where it's running, then run this again.)")
+        raise SystemExit(1)
     print(f"AI Engineering Lab running at http://localhost:{PORT}  (Ctrl+C to stop)")
     try:
         server.serve_forever()

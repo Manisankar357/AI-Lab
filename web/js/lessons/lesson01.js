@@ -4,6 +4,8 @@
 
 import { h, html } from "../ui.js";
 import { codeWalk } from "../widgets/codewalk.js";
+import { flowMap } from "../widgets/flowmap.js";
+import { levels } from "../widgets/levels.js";
 
 const inr = (n) => "₹" + Math.round(n).toLocaleString("en-IN");
 
@@ -49,8 +51,6 @@ const WIRES = {
   "ram-storage": "M350,240 L350,300",
   "output-ram": "M425,200 L530,200",
 };
-const center = (id) => { const p = PARTS[id]; return [p.x + p.w / 2, p.y + p.h / 2]; };
-const wireKey = (a, b) => [a, b].sort().join("-");
 
 const JOURNEYS = {
   photo: { label: "📷 Open a photo", steps: [
@@ -83,78 +83,13 @@ const JOURNEYS = {
 };
 
 function computerMap() {
-  const NS = "http://www.w3.org/2000/svg";
-  const s = (tag, attrs = {}, ...kids) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); kids.forEach((k) => el.append(k)); return el; };
-  const svg = s("svg", { viewBox: "0 0 700 400", class: "cmap", role: "group", "aria-label": "Map of a computer's parts" });
-  const wireEls = {};
-  for (const [k, d] of Object.entries(WIRES)) { wireEls[k] = s("path", { d, class: "wire" }); svg.append(wireEls[k]); }
-  const partEls = {};
-  for (const [id, p] of Object.entries(PARTS)) {
-    const g = s("g", { class: "part", tabindex: 0, role: "button", "aria-label": p.name },
-      s("rect", { x: p.x, y: p.y, width: p.w, height: p.h, rx: 12 }),
-      s("text", { class: "t1", x: p.x + p.w / 2, y: p.y + p.h / 2 - 3, "text-anchor": "middle" }, p.t1),
-      s("text", { class: "t2", x: p.x + p.w / 2, y: p.y + p.h / 2 + 16, "text-anchor": "middle" }, p.t2));
-    const pick = () => { stop(); showPart(id); };
-    g.addEventListener("click", pick);
-    g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
-    partEls[id] = g;
-    svg.append(g);
-  }
-  const dot = s("circle", { r: 9, class: "dot", cx: 0, cy: 0, style: "opacity:0" });
-  svg.append(dot);
-
-  const info = h("div.part-info");
-  const counter = h("span.small.faint");
-  let journey = null, idx = 0, timer = null;
-
-  function light(ids, wire) {
-    Object.entries(partEls).forEach(([id, g]) => g.classList.toggle("on", ids.includes(id)));
-    Object.entries(wireEls).forEach(([k, w]) => w.classList.toggle("hot", k === wire));
-  }
-  function showPart(id) {
-    const p = PARTS[id];
-    light([id]);
-    dot.style.opacity = 0;
-    info.innerHTML = `<div class="eyebrow">Part</div><h3>${p.name}</h3><p>${p.role}</p>
-      <div class="analogy">🏢 ${p.analogy}</div>
-      <dl><dt>Examples</dt><dd>${p.examples}</dd><dt>You notice it when</dt><dd>${p.feel}</dd></dl>`;
-    jBtns.forEach((b) => b.classList.remove("on"));
-    counter.textContent = "";
-  }
-  function step(n) {
-    const steps = JOURNEYS[journey].steps;
-    idx = Math.max(0, Math.min(steps.length - 1, n));
-    const [part, text] = steps[idx];
-    const prev = idx > 0 ? steps[idx - 1][0] : null;
-    light([part], prev && prev !== part ? wireKey(prev, part) : null);
-    const [cx, cy] = center(part);
-    dot.style.opacity = 1;
-    dot.style.transform = `translate(${cx}px, ${cy - (PARTS[part].h / 2) - 2}px)`;
-    info.innerHTML = `<div class="eyebrow">${JOURNEYS[journey].label} · step ${idx + 1} of ${steps.length}</div><p style="font-size:1rem">${text}</p>`;
-    counter.textContent = `Step ${idx + 1} / ${steps.length}`;
-    if (idx === steps.length - 1) stop();
-  }
-  function play(key) {
-    stop();
-    journey = key;
-    jBtns.forEach((b) => b.classList.toggle("on", b.dataset.key === key));
-    step(0);
-    timer = setInterval(() => step(idx + 1), 3000);
-    pauseBtn.textContent = "❚❚ Pause";
-  }
-  function stop() { clearInterval(timer); timer = null; pauseBtn.textContent = "▶ Resume"; }
-
-  const jBtns = Object.entries(JOURNEYS).map(([key, j]) => { const b = h("button.btn.secondary.sm", { type: "button", onclick: () => play(key) }, j.label); b.dataset.key = key; return b; });
-  const pauseBtn = h("button.btn.ghost.sm", { type: "button", onclick: () => journey && (timer ? stop() : (timer = setInterval(() => step(idx + 1), 3000), pauseBtn.textContent = "❚❚ Pause")) }, "▶ Resume");
-  const backBtn = h("button.btn.ghost.sm", { type: "button", onclick: () => { if (journey) { stop(); step(idx - 1); } } }, "←");
-  const nextBtn = h("button.btn.ghost.sm", { type: "button", onclick: () => { if (journey) { stop(); step(idx + 1); } } }, "→");
-
-  info.innerHTML = `<h3>Tap any part</h3><p class="muted">…to see what it does, with an office analogy. Or press a journey button above to watch data travel through the computer.</p>`;
-  return h("div",
-    h("div.journey-btns", jBtns),
-    h("div.cmap-wrap",
-      h("div", svg, h("div.row", { style: { marginTop: "8px" } }, backBtn, pauseBtn, nextBtn, counter)),
-      h("div.card", { style: { boxShadow: "none" } }, info)));
+  return flowMap({
+    nodes: PARTS,
+    edges: Object.entries(WIRES).map(([k, d]) => [...k.split("-"), d]),
+    journeys: JOURNEYS,
+    ariaLabel: "Map of a computer's parts",
+    intro: `<h3>Tap any part</h3><p class="muted">…to see what it does, with an office analogy. Or press a journey button above to watch data travel through the computer.</p>`,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +235,7 @@ function cardProgram(ctx) {
     // Record every run (not just the final one) so the review can see how you got there.
     save({ passed: verdict.ok, lastResult: verdict.ok ? "passed" : verdict.msg.replace(/<[^>]+>/g, ""), runs: (ctx.exercise("cards")?.runs || 0) + 1 });
     result.innerHTML = verdict.ok
-      ? `<div class="callout good"><b>🎉 Your first program works!</b> ₹10,020 on screen and saved to storage. You just did what every programmer does: broke a job into <b>exact steps</b>, put them in the <b>right order</b>, and made sure each step only uses things that are <b>already available</b>. Scroll to section 16 to see this same program written in real Python.</div>`
+      ? `<div class="callout good"><b>🎉 Your first program works!</b> ₹10,020 on screen and saved to storage. You just did what every programmer does: broke a job into <b>exact steps</b>, put them in the <b>right order</b>, and made sure each step only uses things that are <b>already available</b>. Scroll to section 17 to see this same program written in real Python.</div>`
       : `<div class="callout warn"><b>Not yet.</b> ${verdict.msg}</div>`;
     paint();
     const rowsAfter = [...prog.querySelectorAll(".icard")];
@@ -438,10 +373,127 @@ function dataSize() {
 }
 
 // ---------------------------------------------------------------------------
+// Beginner → Pro ladder for this lesson
+// ---------------------------------------------------------------------------
+const PYRAMID = [
+  ["CPU registers", "a few hundred bytes", "instant", 12],
+  ["CPU cache (L1/L2/L3)", "a few MB", "~1–10 ns", 26],
+  ["RAM", "8–32 GB", "~100 ns", 44],
+  ["SSD storage", "256 GB – 2 TB", "~50,000 ns", 64],
+  ["Network / internet", "the whole world", "~30,000,000 ns", 84],
+];
+
+const CLOUD = {
+  user: { x: 10, y: 150, w: 120, h: 70, t1: "Your user", t2: "phone / browser",
+    name: "The user", role: "Someone opening your app: maybe you, maybe a thousand people at once when the market opens.",
+    analogy: "A customer walking into the office with a question." },
+  internet: { x: 170, y: 150, w: 110, h: 70, t1: "Internet", t2: "network",
+    name: "The internet", role: "Carries the request from the user to your server and the answer back. It adds <b>latency</b>: milliseconds you can reduce but never remove." },
+  lb: { x: 320, y: 150, w: 120, h: 70, t1: "Load balancer", t2: "the receptionist",
+    name: "Load balancer", role: "Spreads incoming requests across several servers, so no single one is overwhelmed, and skips any server that's down.",
+    analogy: "A receptionist sending each customer to whichever worker is free." },
+  app: { x: 480, y: 150, w: 140, h: 70, t1: "App server", t2: "vCPU + RAM",
+    name: "App server (your code runs here)", role: "A rented computer in a data centre running <b>your Python program</b>. Same parts as your laptop: CPU (sold as <b>vCPUs</b>), RAM and disk, but no screen or keyboard.",
+    examples: "Typical small server: 2 vCPU, 4 GB RAM, 30 GB disk",
+    feel: "CPU at 100% → slow responses. RAM full → the program is killed (\"OOMKilled\")." },
+  cache: { x: 480, y: 20, w: 140, h: 70, t1: "Cache", t2: "data kept in RAM",
+    name: "Cache (e.g. Redis)", role: "Keeps frequently-requested answers <b>in RAM</b>, so they don't have to be fetched from the slower database every time. The desk idea, used at scale.",
+    analogy: "Keeping the 10 most-asked files on your desk instead of walking to the cabinet each time." },
+  db: { x: 480, y: 290, w: 140, h: 70, t1: "Database", t2: "storage",
+    name: "Database server", role: "Stores your data permanently on <b>disk</b>, like prices, users and orders, and answers questions about it (Phase 3: SQL).",
+    feel: "Disk full → it can't save new data: \"No space left on device\"." },
+};
+const CLOUD_EDGES = [["user", "internet"], ["internet", "lb"], ["lb", "app"], ["app", "cache"], ["app", "db"]];
+const CLOUD_JOURNEYS = {
+  api: { label: "📡 A user asks your API for RELIANCE prices", steps: [
+    ["user", "A user's app sends a request: <code>GET /prices/RELIANCE</code>."],
+    ["internet", "The request travels over the internet to your server's address, maybe across the country."],
+    ["lb", "The load balancer picks a healthy app server that isn't busy."],
+    ["app", "Your Python code receives the request. It lands in the server's <b>RAM</b>, and the <b>CPU</b> starts working."],
+    ["cache", "First, check the cache (fast RAM). A miss this time: nobody asked for RELIANCE in the last minute."],
+    ["app", "So the app asks the database instead."],
+    ["db", "The database reads the prices from <b>disk</b> (storage), the slow part."],
+    ["app", "The app gets the rows, turns them into JSON, and keeps a copy in the cache for the next user."],
+    ["lb", "The response goes back out…"],
+    ["internet", "…across the internet…"],
+    ["user", "…and the user sees the prices. Total time: maybe 50–200 ms. The next user asking for RELIANCE will be faster, thanks to the cache."],
+  ] },
+};
+
+function serverSizer() {
+  const data = h("input", { type: "range", min: 0, max: 16, step: 0.5, value: 1, "aria-label": "Data kept in memory, GB" });
+  const model = h("select", { "aria-label": "AI model", style: { width: "auto" } },
+    h("option", { value: 0 }, "No AI model"), h("option", { value: 0.5 }, "Small ML model (~0.5 GB)"), h("option", { value: 4 }, "Small language model (~4 GB)"));
+  const users = h("select", { "aria-label": "Traffic", style: { width: "auto" } },
+    h("option", { value: 1 }, "Just me / a few users"), h("option", { value: 2 }, "Hundreds of users"), h("option", { value: 4 }, "Thousands of users at market open"));
+  const dL = h("strong"), out = h("div", { style: { marginTop: "12px" } });
+  function paint() {
+    const d = +data.value, m = +model.value, u = +users.value;
+    dL.textContent = `${d} GB`;
+    const ramNeeded = 1 /* OS + Python */ + d + m * 1.2;
+    const ram = [1, 2, 4, 8, 16, 32, 64].find((g) => g >= ramNeeded * 1.3) || 64; // ~30% headroom
+    const vcpu = Math.max(1, u * (m >= 4 ? 2 : 1));
+    out.innerHTML = `<div class="callout"><b>Starting point: ${vcpu} vCPU · ${ram} GB RAM</b><br>
+      RAM = 1 GB (system + Python) + ${d} GB (data in memory) + ${(m * 1.2).toFixed(1)} GB (model + working space) = ${ramNeeded.toFixed(1)} GB, plus ~30% headroom so a busy moment doesn't crash it.<br>
+      <span class="small muted">This is a rough rule of thumb for a first guess. Pros confirm it with <b>load tests</b> and <b>monitoring</b> (Phase 5), then adjust. Too big wastes money; too small crashes at market open.</span></div>`;
+  }
+  data.addEventListener("input", paint);
+  [model, users].forEach((e) => e.addEventListener("change", paint));
+  paint();
+  return h("div",
+    h("div", h("label.small", "Market data kept in memory: ", dL), data),
+    h("div.row", { style: { marginTop: "10px" } }, model, users),
+    out);
+}
+
+const PRO_LEVELS = (ctx) => [
+  { tier: "basics", title: "The six parts, in one picture", body: () => html(`
+      <pre>          ┌──────── CPU (worker) ────────┐
+Input ──▶ │           RAM (desk)          │ ──▶ Output
+Network ◀▶│                               │
+          └──── Storage (filing cabinet) ─┘</pre>
+      <ul><li>The CPU only works on what's in RAM.</li><li>RAM is fast but forgets; storage is slow but remembers.</li><li>The network is the slowest of all.</li></ul>
+      <p class="small muted">If you can explain these three bullets to a friend, you're ready for the next level.</p>`) },
+  { tier: "under", title: "The memory pyramid: smaller means faster", body: () => h("div",
+      html(`<p>There isn't just "RAM and storage". There's a whole pyramid. The closer to the CPU, the <b>smaller and faster</b>:</p>`),
+      h("div.pyramid", PYRAMID.map(([name, size, speed, w]) =>
+        h("div.pyr-row", h("div.pyr-bar", { style: { width: `${w}%` } }, name), h("div.small.muted", `${size} · ${speed}`)))),
+      html(`<p style="margin-top:12px">The CPU keeps a tiny, super-fast <b>{{cache}}</b> right inside the chip, a "pocket" for things it used a moment ago. When the next number it needs is already in the pocket, it's ~100× faster than going to RAM.</p>
+        <div class="callout"><b>Why this matters to you later:</b> data stored <b>side by side</b> in memory loads into the cache together. That's a big reason <b>NumPy</b> (Phase 6), which packs numbers tightly, can be 50–100× faster than a plain Python list, which scatters them around RAM.</div>
+        <p><b>Cores:</b> an 8-core CPU is 8 workers sharing one desk. But a normal Python program uses <b>one worker</b> at a time by default. Using several cores is a skill you'll learn in Phase 2 (threads vs processes).</p>`)) },
+  { tier: "advanced", title: "Virtual memory, GPUs and why disks are slow", body: () => html(`
+      <h4>Every app thinks it has its own private desk</h4>
+      <p>Windows gives each running program its own <b>{{virtual memory}}</b>: a private, numbered desk. Behind the scenes it maps those numbers to real RAM chips. Two benefits: apps <b>can't read each other's memory</b> (security), and when RAM is full, Windows can quietly move rarely-used parts to the {{page file}} on the SSD. That's the slowdown you saw in the RAM experiment.</p>
+      <h4>GPUs: thousands of tiny workers</h4>
+      <p>A CPU has a few very clever workers. A <b>{{GPU}}</b> (graphics card) has <b>thousands of simple workers</b> that all do the same maths at once. Drawing a screen and training a neural network are both "the same maths on millions of numbers", so AI training runs on GPUs (Phases 13–14).</p>
+      <h4>Why "random" disk reads are slow</h4>
+      <p>Reading one big file from start to end is fast. Jumping around to thousands of tiny places is slow. That's why databases build <b>indexes</b> (like the index at the back of a book) so they know exactly where to look (Phase 3).</p>`) },
+  { tier: "pro", title: "The same parts, running a real product", body: () => h("div",
+      html(`<p>When you deploy an app (Phase 5), you rent computers in a data centre: the <b>{{cloud}}</b>. They have exactly the parts you learned today, sold as <b>{{vCPU}}s</b>, <b>GB of RAM</b> and <b>GB of disk</b>. Here's how a real request flows through a production system. Tap the boxes, then press the journey:</p>`),
+      flowMap({ width: 640, height: 380, nodes: CLOUD, edges: CLOUD_EDGES, journeys: CLOUD_JOURNEYS, ariaLabel: "Production request flow" }),
+      html(`<h4 style="margin-top:18px">Try it: size a server for your Market Data API</h4>`),
+      serverSizer(),
+      html(`<h4 style="margin-top:18px">Production incidents: which part is failing?</h4>
+        <p>This is what being "on call" looks like. Pros read the symptoms, find the part, and fix it.</p>`),
+      ctx.choiceQuiz("incident", [
+        { q: "Your API container keeps restarting. The logs say <code>OOMKilled</code> (Out Of Memory).", answer: "ram",
+          why: "The program asked for more RAM than the server has, so the system killed it. Fixes: load less data at once, limit the cache size, or move to a server with more RAM." },
+        { q: "Every morning at 9:15 (market open), response times jump from 50 ms to 4 seconds. The CPU graph sits at 100%.", answer: "cpu",
+          why: "Too much calculating for the workers available. Fixes: cache repeated answers, make the code more efficient, add vCPUs, or run more servers behind the load balancer." },
+        { q: "The database logs: <code>No space left on device</code>. New prices stop being saved.", answer: "storage",
+          why: "The disk is full. Fixes: delete old logs, archive old data, add disk space, and <b>set an alert at 80% full</b> so this never surprises you again." },
+        { q: "Calls from your server to the broker's API time out, but your server's CPU, RAM and disk all look normal.", answer: "network",
+          why: "Your server is fine; the connection to the outside world is the problem. Fixes: timeouts, retries with backoff, and falling back to cached data (Phase 4)." },
+      ], [["cpu", "CPU"], ["ram", "RAM"], ["storage", "Storage / disk"], ["network", "Network"]],
+      { nudge: "Not quite. Read the symptom again: is something <i>full</i>, <i>busy</i>, or <i>unreachable</i>?" }),
+      html(`<div class="callout good" style="margin-top:12px"><b>Pro habit:</b> production teams watch four graphs for every server: <b>CPU %, memory %, disk %, network errors</b>. They set alerts (e.g. at 80%) so they fix problems <i>before</i> users notice. You'll set this up yourself in Phase 5.</div>`)) },
+];
+
+// ---------------------------------------------------------------------------
 // Sections
 // ---------------------------------------------------------------------------
 export const lesson = {
-  requiredAnswers: ["spec_cpu", "spec_ram", "spec_storage", "ram_predict", "ram_actual", "proj", "kc1", "kc2", "kc3", "kc4", "kc5"],
+  requiredAnswers: ["spec_cpu", "spec_ram", "spec_storage", "ram_predict", "ram_actual", "proj", "kc1", "kc2", "kc3", "kc4", "kc5", "pro1"],
   requiredExercises: ["cards"],
 
   sections: [
@@ -642,9 +694,15 @@ Processor: "octa-core, 3.2 GHz"
       ctx.answerBox("kc2", "2. What does the CPU do? Why can't it work directly on files in storage?"),
       ctx.answerBox("kc3", "3. In the power cut, why was the saved text still there but the unsaved text lost?"),
       ctx.answerBox("kc4", "4. What is a byte? What's the biggest number one byte can hold, and why?"),
-      ctx.answerBox("kc5", "5. Your market data is 12 GB and your laptop has 8 GB of RAM. What problem will you hit? Any idea how you might deal with it? (A guess is fine.)")),
+      ctx.answerBox("kc5", "5. Your market data is 12 GB and your laptop has 8 GB of RAM. What problem will you hit? Any idea how you might deal with it? (A guess is fine.)"),
+      ctx.answerBox("pro1", "6. 🔴 Pro: your deployed API keeps crashing with \"OOMKilled\". Which part is the problem? Name two ways to fix it. (Section 16 helps.)")),
 
-    // 16 Next + sneak peek at real code
+    // 16 Beginner → Pro
+    (ctx) => h("div",
+      html(`<p>Everything so far was the 🟢 <b>basics</b>. Real engineers know the same parts at a much deeper level, all the way to the servers that run real products. Climb one level at a time. Each level builds on the one before it.</p>`),
+      levels(ctx, "levels", PRO_LEVELS(ctx))),
+
+    // 17 Next + sneak peek at real code
     () => h("div",
       html(`
         <p><b>Next: Lesson 2, What Is a Program?</b> You already built one with cards! Next you'll see how programs are written as text, saved as files, and why programming languages exist.</p>

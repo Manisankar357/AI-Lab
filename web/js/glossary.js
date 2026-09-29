@@ -23,6 +23,12 @@ export const GLOSSARY = {
   "Operating system": { lesson: "L01", def: "The main program that manages the computer (Windows, macOS, Android). It runs other apps and shares the CPU, RAM and storage between them." },
   "Program": { lesson: "L01", def: "A list of exact instructions for a computer to follow, in order. Apps are programs." },
   "Data": { lesson: "L01", def: "Information stored as numbers: prices, text, photos, sounds. To a computer, everything is data made of bits." },
+  "Cache": { lesson: "L01", def: "A small, fast store that keeps recently or frequently used data close by, so it doesn't have to be fetched from somewhere slower again." },
+  "Virtual memory": { lesson: "L01", def: "The OS gives every program its own private, numbered memory space and maps it onto real RAM (or the page file) behind the scenes." },
+  "GPU": { lesson: "L01", def: "Graphics Processing Unit: a chip with thousands of simple workers doing the same maths at once. Used for graphics and for training AI." },
+  "Cloud": { lesson: "L01", def: "Computers in someone else's data centre that you rent by the hour to run your programs (e.g. AWS, Google Cloud, Azure)." },
+  "vCPU": { lesson: "L01", def: "Virtual CPU: one share of a real CPU core, the unit in which cloud servers are rented." },
+  "Latency": { lesson: "L01", def: "The delay between asking for something and getting the answer, usually in milliseconds (ms)." },
   "OHLCV": { lesson: "L01", def: "Open, High, Low, Close, Volume: the five numbers that describe one period (e.g. one day) of a stock's trading." },
 };
 

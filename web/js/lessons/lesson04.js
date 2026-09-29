@@ -2,6 +2,7 @@
 // Each entry in `sections` renders one of the 16 standard lesson sections.
 
 import { h, html } from "../ui.js";
+import { levels } from "../widgets/levels.js";
 
 // ---------------------------------------------------------------------------
 // Real data: `python -m dis trade.py` on CPython 3.14.2 (this machine).
@@ -66,7 +67,7 @@ const STEPS = [
   { t: "6 · Run line 1: price = 100", layers: ["prog", "interp", "cpumem", "hw"], ram: ["exe", "src", "code", "price"], term: ["cmd"], code: true, line: 1,
     body: "The interpreter's <b>evaluation loop</b> (C code, running on the CPU) executes each instruction. It pushes the object <code>100</code> onto a <b>stack</b>, then <code>STORE_NAME</code> pops it and binds the <i>name</i> <code>price</code> to it." },
   { t: "7 · Run line 2: qty = 3", layers: ["prog", "interp", "cpumem", "hw"], ram: ["exe", "src", "code", "price", "qty"], term: ["cmd"], code: true, line: 2,
-    body: "Same pattern: push <code>3</code>, then bind the name <code>qty</code> to it. Every assignment in Python works this way: a <b>name</b> is bound to an <b>object</b>. (Lesson 6 is all about this.)" },
+    body: "Same pattern: push <code>3</code>, then bind the name <code>qty</code> to it. Every assignment in Python works this way: a <b>name</b> is bound to an <b>object</b>. (Lesson 7 is all about this.)" },
   { t: "8 · Run line 3: total = price * qty", layers: ["prog", "interp", "cpumem", "hw"], ram: ["exe", "src", "code", "price", "qty", "total"], term: ["cmd"], code: true, line: 3,
     body: "Look up <code>price</code>, look up <code>qty</code>: two values on the stack. <code>BINARY_OP *</code> pops both, and the interpreter's C code eventually runs a real CPU multiply instruction. It pushes <code>300</code>, which is then stored as <code>total</code>." },
   { t: "9 · Run line 4: print(total)", layers: ["prog", "interp", "cpumem"], ram: ["exe", "src", "code", "price", "qty", "total"], term: ["cmd"], code: true, line: 4,
@@ -563,12 +564,25 @@ brokerage = 20</pre>
       ctx.answerBox("kc5", "5. Using the latency numbers, explain why fetching 1,00,000 prices with one API call each is a bad design. What would you do instead?"),
       ctx.answerBox("kc6", "6. Where will you use this knowledge? Give one example from your own future market-data project.")),
 
-    // 16 Next
+    // 16 Beginner → Pro
+    (ctx) => levels(ctx, "levels", [
+      { tier: "basics", title: "Program vs process", body: () => html(`<p>A <b>program</b> is a file on disk. A <b>process</b> is that program <i>running</i>: loaded into RAM, with its own PID and memory, taking turns on the CPU. <code>python trade.py</code> creates one process, which ends when the last line finishes.</p>`) },
+      { tier: "under", title: "Scheduling: sharing the CPU", body: () => html(`<p>Your laptop runs hundreds of processes but has only a few cores. The OS <b>scheduler</b> gives each one a tiny time slice (milliseconds) and switches between them so fast that they all seem to run at once. In Task Manager you can see each one's CPU share.</p>`) },
+      { tier: "advanced", title: "Processes, threads and memory isolation", body: () => html(`<p>Each process has a <b>private memory space</b>, so one crashing app can't corrupt another. A process can contain several <b>threads</b> (workers sharing the same memory). Python has an extra rule about threads that you'll meet in Phase 2, and it's why data work often uses several <i>processes</i> instead.</p>`) },
+      { tier: "pro", title: "Processes in production", body: () => html(`<p>A web API is a <b>long-running process</b>: it starts, then waits for requests forever. In production:</p>
+        <ul><li><b>Something must restart it when it crashes</b>: a process manager, Docker, or the cloud platform (Phase 5).</li>
+        <li><b>It logs to stdout</b>, and the platform collects those logs, because nobody is watching a terminal.</li>
+        <li><b>Health checks</b> ask it "are you alive?" every few seconds. If it stops answering, it gets replaced.</li>
+        <li><b>Graceful shutdown</b>: on deploy it finishes the requests already in progress before exiting, so no user sees an error.</li></ul>
+        <p>Everything you traced in this lesson (process, memory, output through the OS) is exactly what those tools manage.</p>`) },
+    ]),
+
+    // 17 Next
     () => html(`
       <p><b>This lesson unlocks:</b></p>
       <ul>
         <li><b>Lesson 5, Your Python Environment:</b> what PATH really is (why <code>'python' is not recognized</code> happens), environment variables, virtual environments, packages, and a proper project structure. This is the OS layer, up close.</li>
-        <li><b>Lesson 6, Variables and Memory:</b> you already saw <code>STORE_NAME price</code>. Next you'll see that a Python variable is a <i>name pointing at an object in RAM</i>, and why that matters when you copy lists of prices.</li>
+        <li><b>Lesson 7, Variables and Memory:</b> you already saw <code>STORE_NAME price</code>. Next you'll see that a Python variable is a <i>name pointing at an object in RAM</i>, and why that matters when you copy lists of prices.</li>
         <li><b>Later, Phase 2:</b> why NumPy is 50–100× faster than a Python loop. It skips the evaluation loop you just traced.</li>
       </ul>`),
   ],

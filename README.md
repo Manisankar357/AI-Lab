@@ -64,6 +64,14 @@ No build step and no frameworks, on purpose: later in the curriculum you'll read
 | `Build mode: next project.` | Requirements only; you build it |
 | `Review my L01 work.` | A code review: what works, what's risky, why; no rewrite |
 
+## From beginner to production pro
+
+- **21 phases, ~725 hours**: computing basics → Python → databases → APIs → **production deployment** (Docker, CI/CD, cloud, monitoring) → data science → ML → deep learning → RAG/LLMs → **MLOps & LLMOps**.
+- **Every lesson climbs 🟢 Basics → 🟡 Under the hood → 🟠 Advanced → 🔴 Pro: in production** (`web/js/widgets/levels.js`).
+- **Data-flow maps** (`web/js/widgets/flowmap.js`): tappable boxes plus animated journeys showing exactly how data moves through a system.
+- **Deadlines**: every lesson and phase has planned hours; the **Study plan** page turns them into dates using your hours per day and study days per week, tracks time logged per lesson, and can re-plan from today if you fall behind (`web/js/plan.js`).
+- **Production checklist**: 16 points (tests, logging, secrets, Docker, CI, deployed URL, HTTPS, monitoring, evals…). Every project lists which it must meet; from P06 on, projects go live on the internet.
+
 ## Built for a complete beginner
 
 - Every lesson assumes only the lessons before it. Later lessons stay 🔒 locked until earlier ones are reviewed.

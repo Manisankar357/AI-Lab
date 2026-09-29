@@ -4,14 +4,16 @@
 
 import { lessonById, DIFFICULTY, phaseByKey, LESSONS } from "../curriculum.js";
 import { lessonState, updateLesson, getState, isLocked } from "../store.js";
-import { lookup } from "../glossary.js";
+import { linkTerms } from "../terms.js";
 import { h, statusBadge, toast } from "../ui.js";
+import { deadlineStrip } from "./deadline.js";
+import { subscribe } from "../store.js";
 
 export const SECTION_TITLES = [
   "What are we learning?", "Why does it matter?", "Mental model", "Visual explanation",
   "How it works internally", "Simple example", "Code from scratch", "Interactive experiment",
   "Real-world example", "Financial-market example", "Common mistakes", "Debugging challenge",
-  "Coding exercise", "Mini project", "Knowledge check", "What this unlocks next",
+  "Coding exercise", "Mini project", "Knowledge check", "Beginner → Pro: go deeper", "What this unlocks next",
 ];
 
 // ---- Helpers handed to lesson modules --------------------------------------
@@ -95,6 +97,11 @@ export async function render(root, id) {
   const phase = phaseByKey(meta.phase);
   const d = DIFFICULTY[meta.difficulty];
 
+  const deadlineHost = h("div");
+  const paintDeadline = () => deadlineHost.replaceChildren(deadlineStrip(id));
+  paintDeadline();
+  const unsubDeadline = subscribe(paintDeadline);
+
   const tocLinks = [];
   const sectionEls = lesson.sections.map((sec, i) => {
     const num = String(i + 1).padStart(2, "0");
@@ -110,9 +117,10 @@ export async function render(root, id) {
       tocLinks[i]?.classList.toggle("done", done);
     };
     doneBtn.addEventListener("click", () => {
+      const markDone = !(ctx.state().sectionsDone || []).includes(i + 1);
       updateLesson(id, (l) => {
         const set = new Set(l.sectionsDone || []);
-        set.has(i + 1) ? set.delete(i + 1) : set.add(i + 1);
+        markDone ? set.add(i + 1) : set.delete(i + 1);
         l.sectionsDone = [...set].sort((a, b) => a - b);
       });
       paintDone();
@@ -177,45 +185,15 @@ export async function render(root, id) {
       h("div",
         h("div.eyebrow", `Lesson ${id.slice(1)} · Phase ${phase.num}: ${phase.title}`),
         h("h1", meta.title),
-        h("p", `${d.dot} ${d.label} · about ${meta.minutes} minutes · work at your own pace, progress saves automatically`)),
+        h("p", `${d.dot} ${d.label} · ${meta.hours} hours planned · progress saves automatically`),
+        deadlineHost),
       statusBadge(ctx.state().status)),
     h("div.lesson-layout", toc, h("div.lesson-body", sectionEls, gate)),
   );
 
   if (location.hash.includes("#s")) document.getElementById(location.hash.split("#").pop())?.scrollIntoView();
-  return () => spy.disconnect();
-}
-
-// Turn {{word}} / {{shown text|Key}} in lesson text into a tappable meaning.
-const TERM_RE = /\{\{([^}|]+)(?:\|([^}]+))?\}\}/g;
-export function linkTerms(node) {
-  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-  const hits = [];
-  while (walker.nextNode()) if (walker.currentNode.nodeValue.includes("{{")) hits.push(walker.currentNode);
-  for (const text of hits) {
-    const frag = document.createDocumentFragment();
-    let last = 0;
-    text.nodeValue.replace(TERM_RE, (m, shown, key, at) => {
-      frag.append(text.nodeValue.slice(last, at));
-      const entry = lookup(key || shown);
-      if (entry) {
-        const tip = h("span.tip", { role: "tooltip" }, h("b", entry.word), entry.def);
-        const btn = h("button.term", { type: "button" }, shown, tip);
-        // Keep the bubble on screen when the word is near an edge.
-        const place = () => requestAnimationFrame(() => {
-          tip.style.marginLeft = "0px";
-          const r = tip.getBoundingClientRect();
-          const shift = r.right > innerWidth - 8 ? innerWidth - 8 - r.right : r.left < 8 ? 8 - r.left : 0;
-          tip.style.marginLeft = `${shift}px`;
-        });
-        btn.addEventListener("mouseenter", place);
-        btn.addEventListener("focus", place);
-        frag.append(btn);
-      } else frag.append(shown);
-      last = at + m.length;
-    });
-    frag.append(text.nodeValue.slice(last));
-    text.replaceWith(frag);
-  }
-  return node;
+  // Keep section ticks and the review box current if progress changes underneath
+  // (e.g. merged from another tab). Answer boxes are left alone, so typing isn't interrupted.
+  const unsubSections = subscribe(() => { sectionEls.forEach((el) => el._paint()); paintGate(); });
+  return () => { spy.disconnect(); unsubDeadline(); unsubSections(); };
 }

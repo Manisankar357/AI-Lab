@@ -1,12 +1,13 @@
 import { PHASES, LESSONS, PROJECTS, phaseByKey } from "../curriculum.js";
 import {
   getState, lessonState, phaseProgress, overallProgress, streak, codingMinutes,
-  toggleTimer, conceptsSummary, revisionQueue, subscribe,
+  toggleTimer, conceptsSummary, revisionQueue, subscribe, currentLessonId,
 } from "../store.js";
 import { h, progressBar, statusBadge, stagger } from "../ui.js";
+import { deadlineStrip } from "./deadline.js";
 
 // The current lesson is the first one not yet mastered.
-export const currentLesson = () => LESSONS.find((l) => lessonState(l.id).status !== "mastered") || LESSONS.at(-1);
+export const currentLesson = () => LESSONS.find((l) => l.id === currentLessonId());
 
 const fmtHours = (m) => (m < 60 ? `${m}m` : `${(m / 60).toFixed(1)}h`);
 
@@ -42,8 +43,9 @@ export function render(root) {
           h("div",
             h("div.eyebrow", "Current mission"),
             h("h2", cur.title),
-            h("p.muted", { style: { margin: 0 } }, `Lesson ${cur.id.slice(1)} · about ${cur.minutes} min · `, statusBadge(curState.status))),
+            h("p.muted", { style: { margin: 0 } }, `Lesson ${cur.id.slice(1)} · ${cur.hours} hours planned · `, statusBadge(curState.status))),
           h("a.btn", { href: `#/lesson/${cur.id}` }, curState.status === "not_started" ? "Start lesson →" : "Continue →")),
+        deadlineStrip(cur.id, { timer: false }),
         curState.status === "awaiting_review"
           ? h("div.callout.warn", { style: { marginTop: "14px", marginBottom: 0 } },
             "Your work is waiting for review. In Claude Code, say: ", h("code", `review my ${cur.id} work`))

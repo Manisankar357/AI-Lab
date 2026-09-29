@@ -8,10 +8,12 @@ const LOCAL_KEY = "ai-lab-progress-fallback";
 const listeners = new Set();
 let state = null;
 let saveTimer = null;
+let pending = []; // changes not yet confirmed by the server (replayed on conflict)
 export let saveStatus = "idle"; // idle | saving | saved | offline
 
 const emptyProgress = () => ({
   version: 1,
+  rev: 0,           // save counter: the server rejects saves based on an older copy
   startedAt: new Date().toISOString(),
   activity: {},     // { "YYYY-MM-DD": minutes }
   activeDays: [],   // days with any learning interaction
@@ -68,9 +70,15 @@ export const subscribe = (fn) => { listeners.add(fn); return () => listeners.del
 const notify = () => listeners.forEach((fn) => fn(state));
 
 // Mutate through update() so every change is saved and the UI re-renders.
+// Mutators must be safe to re-apply: if another tab saved first, we reload the
+// latest progress and replay our unsaved changes on top of it.
 export function update(mutator, { markActive = true } = {}) {
-  mutator(state);
-  if (markActive && !state.activeDays.includes(today())) state.activeDays.push(today());
+  const change = (s) => {
+    mutator(s);
+    if (markActive && !s.activeDays.includes(today())) s.activeDays.push(today());
+  };
+  change(state);
+  pending.push(change);
   notify();
   scheduleSave();
 }
@@ -87,13 +95,29 @@ async function save() {
   saveStatus = "saving";
   notify();
   try {
-    const res = await fetch("/api/progress", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state),
-    });
-    if (!res.ok) throw new Error(res.statusText);
-    saveStatus = "saved";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const sent = pending.length;
+      const res = await fetch("/api/progress", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(state),
+      });
+      if (res.status === 409) {
+        // Another tab saved first: take its copy, then re-apply our changes.
+        const fresh = await (await fetch("/api/progress")).json();
+        state = { ...emptyProgress(), ...fresh };
+        applyReviews();
+        pending.forEach((change) => change(state));
+        continue;
+      }
+      if (!res.ok) throw new Error(res.statusText);
+      state.rev = (await res.json()).rev;
+      pending = pending.slice(sent);
+      saveStatus = "saved";
+      notify();
+      return;
+    }
+    throw new Error("could not save after retries");
   } catch {
     saveStatus = "offline";
     try { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); } catch { /* ignore */ }
@@ -152,16 +176,35 @@ export function codingMinutes() {
   return Math.floor(logged + running);
 }
 
+// The first lesson that isn't mastered yet.
+export const currentLessonId = () => (LESSONS.find((l) => lessonState(l.id).status !== "mastered") || LESSONS.at(-1)).id;
+
+// Study time is logged per day (for the streak) and per lesson (for deadlines).
 export function toggleTimer() {
+  const stopping = !!state.timer.runningSince;
+  const startedAt = state.timer.runningSince;
+  const startLesson = currentLessonId();
   update((s) => {
-    if (s.timer.runningSince) {
-      const mins = Math.round((Date.now() - s.timer.runningSince) / 60000);
+    if (stopping) {
+      if (!s.timer.runningSince) return; // already stopped elsewhere
+      const mins = Math.round((Date.now() - startedAt) / 60000);
       s.activity[today()] = (s.activity[today()] || 0) + mins;
+      const id = s.timer.lessonId || currentLessonId();
+      const l = s.lessons[id] || (s.lessons[id] = lessonState(id));
+      l.minutes = (l.minutes || 0) + mins;
       s.timer.runningSince = null;
-    } else {
+      s.timer.lessonId = null;
+    } else if (!s.timer.runningSince) {
       s.timer.runningSince = Date.now();
+      s.timer.lessonId = startLesson;
     }
   });
+}
+
+export function lessonMinutes(id) {
+  const running = state.timer.runningSince && (state.timer.lessonId || currentLessonId()) === id
+    ? (Date.now() - state.timer.runningSince) / 60000 : 0;
+  return Math.floor((lessonState(id).minutes || 0) + running);
 }
 
 // ---- Spaced revision --------------------------------------------------------
