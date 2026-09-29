@@ -1,0 +1,6 @@
+# Your progress, answers and review notes stay on this computer only
+# (the GitHub repo is public). Back up the data/ folder yourself if needed.
+data/
+__pycache__/
+*.pyc
+.venv/
