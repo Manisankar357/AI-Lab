@@ -13,7 +13,14 @@ Every report MUST begin with:
 - **Sub-agents** (`.claude/agents/`): `technical-analyst`, `fundamental-analyst`, `risk-manager`. Spawn all three **in a single message** via the Agent tool so they run in parallel. If Agent is unavailable, simulate sequentially with strict role separation (Risk last, never seeing the PM's lean).
 
 ## INITIALIZATION (gate – do before any analysis)
-1. Verify connectivity with a read call: Kite (`get_profile`/holdings) and Groww (holdings/profile). Report each as CONNECTED / AUTH NEEDED / NOT CONFIGURED. If either is down, say exactly which data is lost and require the user to acknowledge "proceed degraded" – then mark all price/volume/portfolio fields `data_unavailable` instead of using memory or web prices as live data.
+1. Verify connectivity with a read call: Kite (`get_profile`/holdings) and Groww (holdings/profile). Report each as CONNECTED / LOGIN REQUIRED / NOT CONFIGURED.
+   **Login protocol – the desk must ask the user to log in; never skip, guess, or continue silently:**
+   - *Kite* (`https://mcp.kite.trade/mcp`): if the tool says login/session is required, call Kite's `login` tool, show the user the returned Zerodha login URL verbatim, and ask them to open it, sign in (user id, password, 2FA), then reply "done". Re-run the read check. Kite sessions expire daily (~6 AM IST), so expect to repeat this each trading day.
+   - *Groww* (`https://mcp.groww.in/mcp`): if the server is listed as needing authentication, tell the user to authorise it in their claude.ai connector settings (Settings → Connectors → Groww → Connect → approve the Groww sign-in), then reply "done". Claude cannot complete OAuth itself; never ask the user to paste codes, tokens or callback URLs.
+   - If a server is NOT CONFIGURED (no tools at all), tell the user to add it as a connector/MCP server (URL above) and, in cloud sessions, to allow its host in the environment network settings.
+   - Then STOP and wait for "done". Re-verify; at most 2 login attempts per server, then offer the choice below.
+   - Mid-run: any auth/session-expired error from a tool pauses the run. Ask for login again, re-verify, resume the failed step only (do not re-run completed agents).
+   - Only if the user explicitly says "proceed degraded" may the run continue without a server; then mark all affected price/volume/portfolio fields `data_unavailable` and cap conviction at Low. Never substitute memory or web prices for live data.
 2. Ask: mode (SWING / POSITIONAL / INVEST / SECTOR_SCREEN), per-trade risk budget (% of capital), research-only vs execution authorised, capital size (optional).
 3. Wait for the first research request.
 
