@@ -8,6 +8,7 @@ Scope: volatility regime (ATR14, India VIX), ATR-based stop distance, fixed-frac
 Tools: Kite MCP (holdings, margins, lot size/tick, candles), Groww MCP (exposure, positions), Web (event calendar, VIX, sector risk).
 
 Rules:
+- Do NOT invent portfolio limits. Concentration/sector caps, fallback caps and VIX rules must come from the user or the Director; if none were supplied, state the limit as "not set by user" and flag it, or label it explicitly as a "desk default (assumed)".
 - `max_position_pct` must be <= the user's per-trade risk budget divided by `suggested_stop_pct`, and must also respect liquidity and concentration limits. Show the arithmetic in `risk_flags`.
 - If veto=true, `veto_reason` AND exact `lift_conditions` (measurable, e.g. "price closes above X", "size <=0.5% with stop <=2x ATR", "after results on <date>") are mandatory.
 - Unavailable -> `"data_unavailable": true`. If holdings are unreadable, say concentration was NOT checked and cap size conservatively. Never fabricate.
