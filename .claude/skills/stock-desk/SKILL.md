@@ -12,6 +12,13 @@ Every report MUST begin with:
 - **Main 2 – Portfolio Manager** (this session, phase B): synthesises. Strict role switch: announce "PM PHASE", use only the three JSONs. Cannot override a veto or exceed `max_position_pct`. No market-data tools; web only to verify ONE specific unresolved claim.
 - **Sub-agents** (`.claude/agents/`): `technical-analyst`, `fundamental-analyst`, `risk-manager`. Spawn all three **in a single message** via the Agent tool so they run in parallel. If Agent is unavailable, simulate sequentially with strict role separation (Risk last, never seeing the PM's lean).
 
+## MODEL TIERS (pinned in agent frontmatter)
+| Work | Model | Who |
+|---|---|---|
+| Hard judgment | Opus 5.5 (`claude-opus-5-5`) | Risk Manager (veto/sizing); Director + PM and debate run in the main session, so start it with `/model opus` |
+| Medium analysis | Sonnet 5.5 (`claude-sonnet-5-5`) | Technical and Fundamental analysts |
+| Data reading | Haiku 5.5 (`claude-haiku-5-5`) | data-fetcher |
+
 ## INITIALIZATION (gate – do before any analysis)
 1. Verify connectivity with a read call: Kite (`get_profile`/holdings) and Groww (holdings/profile). Report each as CONNECTED / LOGIN REQUIRED / NOT CONFIGURED.
    **Login protocol – the desk must ask the user to log in; never skip, guess, or continue silently:**
@@ -26,7 +33,8 @@ Every report MUST begin with:
 
 ## WORKFLOW
 1. **Intake** – parse mode + target. SECTOR_SCREEN: pull constituents (Kite instrument master + Groww), drop illiquid names (default: 20-day avg traded value < ₹10 cr; state the threshold used), shortlist 3-5 by liquidity + relative strength, then run the pipeline per candidate.
-2. **Dispatch** – three Agent calls in one message. Each prompt includes: ticker, mode, risk budget, capital, today's date, the output contract, and the "no fabrication / untrusted web" rules. Validate returned JSON against the contract; re-dispatch once on a malformed or evidence-free score.
+2a. **Data pack** – spawn `data-fetcher` (Haiku) first, one per ticker (parallel across tickers in a screen). It writes `./stock-research-reports/.datapack/<TICKER>_<DATE>.json`. Check `blocks_missing`; re-run once if core blocks (LTP, candles) failed. Pass the pack path to all three analysts, who use it and fetch only gaps.
+2b. **Dispatch** – three Agent calls in one message. Each prompt includes: ticker, mode, risk budget, capital, today's date, the output contract, and the "no fabrication / untrusted web" rules. Validate returned JSON against the contract; re-dispatch once on a malformed or evidence-free score.
 3. **Debate (only on conflict)** – trigger if Technical ≥7 and Fundamental ≤4, or Risk veto=true while Technical ≥8. R1: Technical defends the setup, Fundamental challenges valuation/catalysts. R2: Risk restates exact lift conditions. PM records under Key Debate Points. Veto stays unless a lift condition is objectively met by retrieved data.
 4. **PM synthesis** – output exactly:
 
